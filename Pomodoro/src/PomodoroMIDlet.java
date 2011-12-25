@@ -1,4 +1,5 @@
-import java.util.Calendar;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -6,16 +7,20 @@ import javax.microedition.lcdui.Command;
 import javax.microedition.lcdui.CommandListener;
 import javax.microedition.lcdui.Display;
 import javax.microedition.lcdui.Displayable;
+import javax.microedition.media.Manager;
+import javax.microedition.media.MediaException;
+import javax.microedition.media.Player;
 import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
 
 public class PomodoroMIDlet extends MIDlet implements CommandListener {
-	private static final int POMODORO_STATE = 0;
-	private static final int SHORT_BREAK_STATE = 1;
-	private static final int LONG_BREAK_STATE = 2;
-	private static final int STOP_STATE = 3;
+	public static final int POMODORO_STATE = 0;
+	public static final int SHORT_BREAK_STATE = 1;
+	public static final int LONG_BREAK_STATE = 2;
+	public static final int STOP_STATE = 3;
 	
-	private final Command startStopCommand = new Command("Start", Command.OK, 1);
+	private final Command startCommand = new Command("Start", Command.OK, 1);
+	private final Command stopCommand = new Command("Stop", Command.OK, 1);
 	private final Command exitCommand = new Command("Exit", Command.EXIT, 1);
 	private final Command optionsCommand = new Command("Options", Command.SCREEN, 1);
 	private final Command saveCommand = new Command("Save", Command.OK, 1);
@@ -25,10 +30,10 @@ public class PomodoroMIDlet extends MIDlet implements CommandListener {
 	private OptionsStore store;
 	
 	private final Timer timer = new Timer();
-	private final ScheduledTask scheduledTask = new ScheduledTask();
+	private volatile ScheduledTask scheduledTask;
 	private volatile int state = STOP_STATE;
 	private volatile int pomodoroCount;
-	private volatile int elapsedMinutes;
+	private volatile int minsLeft;
 
 	public PomodoroMIDlet() {
 	}
@@ -47,13 +52,13 @@ public class PomodoroMIDlet extends MIDlet implements CommandListener {
 		optionsScreen.addCommand(saveCommand);
 		optionsScreen.addCommand(backCommand);
 		timerScreen.addCommand(optionsCommand);
-		timerScreen.addCommand(startStopCommand);
+		timerScreen.addCommand(startCommand);
 		timerScreen.addCommand(exitCommand);
 		optionsScreen.setCommandListener(this);
 		timerScreen.setCommandListener(this);
 		state = STOP_STATE;
 		pomodoroCount = 0;
-		Display.getDisplay(this).setCurrent(optionsScreen);
+		Display.getDisplay(this).setCurrent(timerScreen);
 	}
 	
 	public void commandAction(Command command, Displayable displayable) {
@@ -70,20 +75,39 @@ public class PomodoroMIDlet extends MIDlet implements CommandListener {
 					optionsScreen.getLongBreakMins(),
 					optionsScreen.getPomodoroCounts());
 			Display.getDisplay(this).setCurrent(timerScreen);
-		} else if (command == startStopCommand) {
-			if (state == STOP_STATE) {
-				startPomodoroCycle();
-			} else {
-				stopPomodoroCycle();
-			}
+		} else if (command == startCommand) {
+			startPomodoroCycle();
+		} else if (command == stopCommand) {
+			stopPomodoroCycle();
 		}
 	}
 	
 	private void startPomodoroCycle() {
-		timer.schedule(scheduledTask, 0);
+		state = STOP_STATE;
+		scheduledTask = new ScheduledTask();
+		timer.scheduleAtFixedRate(scheduledTask, 0, 5000);
+		timerScreen.removeCommand(startCommand);
+		timerScreen.addCommand(stopCommand);
 	}
 	private void stopPomodoroCycle() {
+		state = STOP_STATE;
 		scheduledTask.cancel();
+		timerScreen.removeCommand(stopCommand);
+		timerScreen.addCommand(startCommand);
+		timerScreen.clear();
+		playSound();
+	}
+	
+	private void playSound() {
+		String mediaName = state == STOP_STATE? "stop.wav": state == SHORT_BREAK_STATE? 
+				"short.wav": state == LONG_BREAK_STATE? "long.wav": "start.wav";
+		try {
+		    InputStream is = getClass().getResourceAsStream(mediaName);
+		    Player p = Manager.createPlayer(is, "audio/X-wav");
+		    p.start();
+		    is.close();
+		} catch (IOException ioe) {
+		} catch (MediaException me) { }
 	}
 	
 	/**
@@ -91,27 +115,39 @@ public class PomodoroMIDlet extends MIDlet implements CommandListener {
 	 */
 	class ScheduledTask extends TimerTask {
 		public void run() {
-			elapsedMinutes++;
 			if (state == STOP_STATE) {
 				pomodoroCount = 0;
 				state = POMODORO_STATE;
-				elapsedMinutes = 0;
-			} else if (state == POMODORO_STATE && elapsedMinutes >= store.getPomodoroMins()) {
-				pomodoroCount++;
-				state = pomodoroCount == store.getPomodoroCounts()? LONG_BREAK_STATE: 
-					SHORT_BREAK_STATE;
-				elapsedMinutes = 0;
-			} else if (state == SHORT_BREAK_STATE && elapsedMinutes >= store.getShortBreakMins()) {
-				state = POMODORO_STATE;
-				elapsedMinutes = 0;
-			} else if (state == LONG_BREAK_STATE && elapsedMinutes >= store.getLongBreakMins()) {
-				pomodoroCount = 0;
-				state = POMODORO_STATE;
-				elapsedMinutes = 0;
+				minsLeft = store.getPomodoroMins();
+				playSound();
+			} else {
+				minsLeft--;
 			}
-			Calendar now = Calendar.getInstance();
-			now.set(Calendar.MINUTE, now.get(Calendar.MINUTE) + 1);
-			timer.schedule(this, now.getTime());
+			if (minsLeft == 0) {
+				switch(state) {
+				case POMODORO_STATE:
+					pomodoroCount++;
+					if (pomodoroCount == store.getPomodoroCounts()) {
+						state = LONG_BREAK_STATE;
+						minsLeft = store.getLongBreakMins();
+					} else {
+						state = SHORT_BREAK_STATE;
+						minsLeft = store.getShortBreakMins();
+					}
+					break;
+				case SHORT_BREAK_STATE:
+					state = POMODORO_STATE;
+					minsLeft = store.getPomodoroMins();
+					break;
+				case LONG_BREAK_STATE:
+					state = POMODORO_STATE;
+					minsLeft = store.getPomodoroMins();
+					pomodoroCount = 0;
+					break;
+				}
+				playSound();
+			}
+			timerScreen.update(minsLeft, pomodoroCount, state);
 		}
 	}
 }
