@@ -1,7 +1,6 @@
-
-
-
-//import java.util.Timer;
+import java.util.Calendar;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import javax.microedition.lcdui.Command;
 import javax.microedition.lcdui.CommandListener;
@@ -9,8 +8,6 @@ import javax.microedition.lcdui.Display;
 import javax.microedition.lcdui.Displayable;
 import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
-
-
 
 public class PomodoroMIDlet extends MIDlet implements CommandListener {
 	private static final int POMODORO_STATE = 0;
@@ -27,9 +24,11 @@ public class PomodoroMIDlet extends MIDlet implements CommandListener {
 	private TimerScreen timerScreen;
 	private OptionsStore store;
 	
-	//private final Timer timer = new Timer();
-	private int state;
-	private int pomodoroCount;
+	private final Timer timer = new Timer();
+	private final ScheduledTask scheduledTask = new ScheduledTask();
+	private volatile int state = STOP_STATE;
+	private volatile int pomodoroCount;
+	private volatile int elapsedMinutes;
 
 	public PomodoroMIDlet() {
 	}
@@ -72,7 +71,48 @@ public class PomodoroMIDlet extends MIDlet implements CommandListener {
 					optionsScreen.getPomodoroCounts());
 			Display.getDisplay(this).setCurrent(timerScreen);
 		} else if (command == startStopCommand) {
-			
+			if (state == STOP_STATE) {
+				startPomodoroCycle();
+			} else {
+				stopPomodoroCycle();
+			}
+		}
+	}
+	
+	private void startPomodoroCycle() {
+		timer.schedule(scheduledTask, 0);
+	}
+	private void stopPomodoroCycle() {
+		scheduledTask.cancel();
+	}
+	
+	/**
+	 * Task run every minute if pomodoro cycle is active
+	 */
+	class ScheduledTask extends TimerTask {
+		public void run() {
+			elapsedMinutes++;
+			if (state == STOP_STATE) {
+				pomodoroCount = 0;
+				state = POMODORO_STATE;
+				elapsedMinutes = 0;
+			} else if (state == POMODORO_STATE && elapsedMinutes >= store.getPomodoroMins()) {
+				pomodoroCount++;
+				state = pomodoroCount == store.getPomodoroCounts()? LONG_BREAK_STATE: 
+					SHORT_BREAK_STATE;
+				elapsedMinutes = 0;
+			} else if (state == SHORT_BREAK_STATE && elapsedMinutes >= store.getShortBreakMins()) {
+				state = POMODORO_STATE;
+				elapsedMinutes = 0;
+			} else if (state == LONG_BREAK_STATE && elapsedMinutes >= store.getLongBreakMins()) {
+				pomodoroCount = 0;
+				state = POMODORO_STATE;
+				elapsedMinutes = 0;
+			}
+			Calendar now = Calendar.getInstance();
+			now.set(Calendar.MINUTE, now.get(Calendar.MINUTE) + 1);
+			timer.schedule(this, now.getTime());
 		}
 	}
 }
+
