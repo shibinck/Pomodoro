@@ -1,7 +1,8 @@
-MIDlet-1: PomodoroMIDlet,,PomodoroMIDlet
-MIDlet-Jar-URL: Pomodoro.jar
-MIDlet-Name: Pomodoro
-MIDlet-Vendor: shibinck
 MIDlet-Version: 1.0.0
+MIDlet-Icon: icon.png
+MIDlet-Vendor: shibinck
+MIDlet-Jar-URL: Pomodoro.jar
 MicroEdition-Configuration: CLDC-1.0
+MIDlet-1: PomodoroMIDlet,,com.shibinck.pomodoro.PomodoroMIDlet
 MicroEdition-Profile: MIDP-2.1
+MIDlet-Name: Pomodoro

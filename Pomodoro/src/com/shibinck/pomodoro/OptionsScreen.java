@@ -1,4 +1,4 @@
-
+package com.shibinck.pomodoro;
 
 import javax.microedition.lcdui.Form;
 import javax.microedition.lcdui.TextField;

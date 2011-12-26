@@ -1,5 +1,4 @@
-import java.io.IOException;
-import java.io.InputStream;
+package com.shibinck.pomodoro;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -9,7 +8,6 @@ import javax.microedition.lcdui.Display;
 import javax.microedition.lcdui.Displayable;
 import javax.microedition.media.Manager;
 import javax.microedition.media.MediaException;
-import javax.microedition.media.Player;
 import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
 
@@ -99,15 +97,30 @@ public class PomodoroMIDlet extends MIDlet implements CommandListener {
 	}
 	
 	private void playSound() {
-		String mediaName = state == STOP_STATE? "stop.wav": state == SHORT_BREAK_STATE? 
-				"short.wav": state == LONG_BREAK_STATE? "long.wav": "start.wav";
 		try {
-		    InputStream is = getClass().getResourceAsStream(mediaName);
-		    Player p = Manager.createPlayer(is, "audio/X-wav");
-		    p.start();
-		    is.close();
-		} catch (IOException ioe) {
-		} catch (MediaException me) { }
+			int note = 100, duration = 1000;
+			switch(state) {
+			case SHORT_BREAK_STATE:
+				note = 110;
+				duration = 1000;
+				break;
+			case LONG_BREAK_STATE:
+				note = 115;
+				duration = 2000;
+				break;
+			case STOP_STATE:
+				note = 127;
+				duration = 200;
+				break;
+			case POMODORO_STATE:
+				note = 100;
+				duration = 2000;
+				break;
+			}
+		    Manager.playTone(note, duration, 100);
+		} catch (MediaException e) { 
+			e.printStackTrace();
+		}
 	}
 	
 	/**
