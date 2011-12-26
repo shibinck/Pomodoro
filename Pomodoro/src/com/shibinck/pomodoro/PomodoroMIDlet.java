@@ -83,7 +83,7 @@ public class PomodoroMIDlet extends MIDlet implements CommandListener {
 	private void startPomodoroCycle() {
 		state = STOP_STATE;
 		scheduledTask = new ScheduledTask();
-		timer.scheduleAtFixedRate(scheduledTask, 0, 5000);
+		timer.scheduleAtFixedRate(scheduledTask, 0, 60000);
 		timerScreen.removeCommand(startCommand);
 		timerScreen.addCommand(stopCommand);
 	}
